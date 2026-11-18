@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090914">
   <title>Knights of the Hollow</title>
   <style>
-    :root { --gold:#f5c35b; --ink:#090914; --panel:#17172b; }
+    :root { --gold:#f5c35b; --ink:#090914; }
     * { box-sizing:border-box; }
     body { margin:0; overflow:hidden; background:var(--ink); color:#fff; font-family:Georgia,serif; }
     canvas { display:block; width:100vw; height:100vh; }
     #ui { position:fixed; inset:0; pointer-events:none; }
-    #topbar { position:absolute; top:16px; left:50%; transform:translateX(-50%); width:min(680px,70vw); }
+    #topbar { position:absolute; top:16px; left:50%; transform:translateX(-50%); width:min(680px,70vw); text-shadow:0 2px 3px #000; }
     #health { height:18px; border:2px solid #20101a; background:#271923; box-shadow:0 4px 14px #0008; }
-    #healthFill { height:100%; width:100%; background:linear-gradient(90deg,#b52d45,#ef7181); }
-    #levelRow { display:flex; justify-content:space-between; align-items:center; margin-top:7px; font-weight:bold; text-shadow:0 2px 3px #000; }
+    #healthFill { height:100%; width:100%; background:linear-gradient(90deg,#b52d45,#ef7181); transition:width .12s; }
+    #levelRow { display:flex; justify-content:space-between; margin:7px 0 3px; font-weight:bold; }
     #xp { height:7px; background:#27233d; }
     #xpFill { height:100%; width:0; background:linear-gradient(90deg,#55bdf4,#a9eeff); }
     #pause { position:absolute; right:18px; top:18px; width:44px; height:44px; pointer-events:auto; border:1px solid #6d668f; border-radius:50%; background:#17172bcc; color:#fff; cursor:pointer; }
@@ -23,67 +24,180 @@
     h1 { margin:0 0 8px; color:var(--gold); letter-spacing:3px; }
     .subtitle { color:#aaa7bd; margin:0 0 24px; }
     #start { border:0; border-radius:8px; padding:14px 30px; background:linear-gradient(#eec15f,#bd8732); color:#1a1020; font:700 18px Georgia; cursor:pointer; }
+    #start:hover { filter:brightness(1.12); }
     #levelUp { position:absolute; inset:0; display:none; place-items:center; background:#080816aa; pointer-events:auto; }
     #levelUp.show { display:grid; }
     #choices { display:flex; gap:12px; width:min(820px,calc(100vw - 32px)); }
-    .choice { flex:1; min-width:0; border:1px solid #686083; border-radius:12px; padding:18px 12px; color:#fff; background:#1b1b31; cursor:pointer; }
+    .choice { flex:1; min-width:0; border:1px solid #686083; border-radius:12px; padding:18px 12px; color:#fff; background:#1b1b31; cursor:pointer; font:16px Georgia; }
     .choice:hover { border-color:var(--gold); transform:translateY(-3px); }
     .choice b { display:block; color:var(--gold); margin-bottom:8px; }
-    @media(max-width:650px){ #choices{flex-direction:column}.choice{padding:10px}.card{padding:20px} }
+    #hint { position:absolute; bottom:18px; width:100%; text-align:center; color:#aaa7bd; font:14px Arial,sans-serif; text-shadow:0 2px 4px #000; }
+    @media(max-width:650px){ #choices{flex-direction:column}.choice{padding:10px}.card{padding:20px} #topbar{width:65vw} }
   </style>
 </head>
 <body>
-  <canvas id="game"></canvas>
+  <canvas id="game" aria-label="Game arena"></canvas>
   <div id="ui">
     <div id="topbar"><div id="health"><div id="healthFill"></div></div><div id="levelRow"><span id="time">00:00</span><span id="level">LV 1</span></div><div id="xp"><div id="xpFill"></div></div></div>
-    <button id="pause" aria-label="Pause">Ⅱ</button>
-    <div id="menu"><div class="card"><h1>KNIGHTS OF THE HOLLOW</h1><p class="subtitle">A fantasy survival trial</p><button id="start">ENTER THE ARENA</button></div></div>
+    <button id="pause" aria-label="Pause" title="Pause">Ⅱ</button>
+    <div id="hint">Move with WASD or arrow keys · Your knight attacks automatically</div>
+    <div id="menu"><div class="card"><h1 id="title">KNIGHTS OF THE HOLLOW</h1><p class="subtitle" id="subtitle">A fantasy survival trial</p><button id="start">ENTER THE ARENA</button></div></div>
     <div id="levelUp"><div><h2 style="text-align:center;color:var(--gold)">CHOOSE A BLESSING</h2><div id="choices"></div></div></div>
   </div>
 <script>
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-let W,H,dpr;
-function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}resize();addEventListener('resize',resize);
-const keys={};addEventListener('keydown',e=>keys[e.key.toLower();e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLower();e.key.toLowerCase()]=false);
-let pointer={x:0,y:0,down:false};canvas.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.clientY});canvas.addEventListener('pointerdown',e=>{pointer.down=true;pointer.x=e.clientX;pointer.y=e.clientY});canvas.addEventListener('pointerup',()=>pointer.down=false);
-const menu=document.getElementById('menu'),levelUp=document.getElementById('levelUp'),choices=document.getElementById('choices');
-let running=false,paused=false,last=0,elapsed=0,spawnTimer=0,shotTimer=0;
-let player,enemy=[],gems=[],projectiles=[],slashes=[],particles=[];
-function rand(a,b){return a+Math.random*(b-a)}
-function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-function reset(){player={x:0,y:0,r:16,hp:100,maxHp:100,speed:220,damage:18,attackRate:.55,bulletSpeed:430,level:1,xp:0,nextXp:25,magnet:85,pierce:0,orbit:0};enemy=[];gems=[];projectiles=[];slashes=[];particles=[];elapsed=0;spawnTimer=0;shotTimer=0;running=true;paused=false;menu.classList.add('hidden');levelUp.classList.remove('show');last=performance.now()}
-document.getElementById('start').onclick=reset;
-document.getElementById('pause').onclick=()=>{if(running){paused=!paused;document.getElementById('pause').textContent=paused?'▶':'Ⅱ'}};
-const upgrades=[
- {name:'Honed Steel',desc:'+8 sword damage',apply:p=>p.damage+=8},
- {name:'Fleet Footwork',desc:'+15% movement speed',apply:p=>p.speed*=1.15},
- {name:'Quick Draw',desc:'25% faster attacks',apply:p=>p.attackRate*=.75},
- {name:'Silver Heart',desc:'+25 maximum health',apply:p=>{p.maxHp+=25;p.hp+=25}},
- {name:'Lantern Charm',desc:'Larger gem magnet',apply:p=>p.magnet+=55},
- {name:'Swift Arrows',desc:'Faster projectiles',apply:p=>p.bulletSpeed+=150}
+'use strict';
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize); resize();
+const keys = Object.create(null);
+window.addEventListener('keydown', e => {
+  const key = e.key.toLowerCase();
+  keys[key] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+const menu = document.getElementById('menu');
+const levelUp = document.getElementById('levelUp');
+const choices = document.getElementById('choices');
+let running = false, paused = false, last = 0, elapsed = 0, spawnTimer = 0, shotTimer = 0;
+let player, enemies = [], gems = [], projectiles = [], particles = [];
+const rand = (min, max) => min + Math.random() * (max - min);
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function reset() {
+  player = { x:0, y:0, r:16, hp:100, maxHp:100, speed:220, damage:18, attackRate:.55, bulletSpeed:430, level:1, xp:0, nextXp:25, magnet:85 };
+  enemies = []; gems = []; projectiles = []; particles = [];
+  elapsed = 0; spawnTimer = .7; shotTimer = 0; running = true; paused = false;
+  document.getElementById('pause').textContent = 'Ⅱ';
+  document.getElementById('title').textContent = 'KNIGHTS OF THE HOLLOW';
+  document.getElementById('subtitle').textContent = 'A fantasy survival trial';
+  document.getElementById('start').textContent = 'ENTER THE ARENA';
+  levelUp.classList.remove('show'); menu.classList.add('hidden');
+  updateUI(); last = performance.now();
+}
+document.getElementById('start').addEventListener('click', reset);
+document.getElementById('pause').addEventListener('click', () => {
+  if (!running) return;
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? '▶' : 'Ⅱ';
+  if (!paused) last = performance.now();
+});
+const upgrades = [
+  { name:'Honed Steel', desc:'+8 sword damage', apply:p => p.damage += 8 },
+  { name:'Fleet Footwork', desc:'+15% movement speed', apply:p => p.speed *= 1.15 },
+  { name:'Quick Draw', desc:'25% faster attacks', apply:p => p.attackRate *= .75 },
+  { name:'Silver Heart', desc:'+25 maximum health', apply:p => { p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + 25); } },
+  { name:'Lantern Charm', desc:'Larger gem magnet', apply:p => p.magnet += 55 },
+  { name:'Swift Arrows', desc:'Faster projectiles', apply:p => p.bulletSpeed += 150 }
 ];
-function offerLevel(){paused=true;choices.innerHTML='';const pool=[...upgrades].sort(()=>Math.random-.5).slice(0,3);pool.forEach(u=>{const b=document.createElement('button');b.className='choice';b.innerHTML='<b>'+u.name+'</b><span>'+u.desc+'</span>';b.onclick=()=>{u.apply(player);levelUp.classList.remove('show');paused=false;last=performance.now()};choices.appendChild(b)});levelUp.classList.add('show')}
-function spawnEnemy(){const angle=Math.random()*Math.PI*2,dist=Math.max(W,H)*.68+120;enemy.push({x:player.x+Math.cos(angle)*dist,y:player.y+Math.sin(angle)*dist,r:12+(Math.random()<.12?8:0),hp:28+elapsed*.7,maxHp:28+elapsed*.7,speed:38+Math.random*25+elapsed*.18,hit:0})}
-function burst(x,y,c,n=8){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=Math.random*90;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.3,.7),c})}}
-function update(dt){if(!running||paused)return;elapsed+=dt;let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);const m=Math.hypot(dx,dy)||1;player.x+=dx/m*player.speed*dt;player.y+=dy/m*player.speed*dt;
-spawnTimer-=dt;if(spawnTimer<=0){spawnTimer=Math.max(.12,.65-elapsed*.006);spawnEnemy()}
-shotTimer-=dt;if(shotTimer<=0&&enemy.length){let target=null,best=Infinity;for(const e of enemy){const d=distance(player,e);if(d<best){best=d;target=e}}if(target){const a=Math.atan2(target.y-player.y,target.x-player.x);projectiles.push({x:player.x,y:player.y,vx:Math.cos(a)*player.bulletSpeed,vy:Math.sin(a)*player.bulletSpeed,r:5,life:2,pierce:player.pierce}) ;shotTimer=player.attackRate}};
-for(const e of enemy){const a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;e.hit=Math.max(0,e.hit-dt);if(distance(e,player)<e.r+player.r&&!e.hit){player.hp-=10;e.hit=.7;if(player.hp<=0){player.hp=0;running=false;menu.querySelector('h1').textContent='THE HOLLOW CLAIMS YOU';menu.querySelector('.subtitle').textContent='Survived '+formatTime(elapsed)+' • Level '+player.level;document.getElementById('start').textContent='TRY AGAIN';menu.classList.remove('hidden')}}}
-for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;let gone=p.life<=0;for(let j=enemy.length-1;j>=0&&!gone;j--){const e=enemy[j];if(distance(p,e)<p.r+e.r){e.hp-=player.damage;burst(e.x,e.y,'#8ed8ff',4);if(e.hp<=0){gems.push({x:e.x,y:e.y,r:7,vx:rand(-30,30),vy:rand(-30,30),life:10});enemy.splice(j,1)}if(p.pierce<=0)gone=true;else p.pierce--}}if(gone)projectiles.splice(i,1)}
-for(let i=gems.length-1;i>=0;i--){const g=gems[i];const d=distance(g,player);if(d<player.magnet){const a=Math.atan2(player.y-g.y,player.x-g.x);g.vx+=Math.cos(a)*700*dt;g.vy+=Math.sin(a)*700*dt}g.x+=g.vx*dt;g.y+=g.vy*dt;if(d<player.r+g.r){player.xp+=10;if(player.xp>=player.nextXp){player.xp-=player.nextXp;player.level++;player.nextXp=Math.floor(player.nextXp*1.28);offerLevel()}gems.splice(i,1)}}
-for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}
-updateUI()}
-function formatTime(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
-function updateUI(){document.getElementById('healthFill').style.width=(player.hp/player.maxHp*100)+'%';document.getElementById('xpFill').style.width=(player.xp/player.nextXp*100)+'%';document.getElementById('level').textContent='LV '+player.level;document.getElementById('time').textContent=formatTime(elapsed)}
-function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0b0b18';ctx.fillRect(0,0,W,H);const cx=W/2,cy=H/2,sx=cx-player.x,sy=cy-player.y;ctx.save();ctx.translate(sx,sy);
-ctx.strokeStyle='#17172a';ctx.lineWidth=1;const grid=64;for(let x=(( -player.x%grid)-grid);x<W;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=(( -player.y%grid)-grid);y<H;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-for(const g of gems){ctx.fillStyle='#65d5a5';ctx.beginPath();ctx.moveTo(g.x,g.y-7);ctx.lineTo(g.x+5,g.y);ctx.lineTo(g.x,g.y+7);ctx.lineTo(g.x-5,g.y);ctx.closePath();ctx.fill()}
-for(const p of projectiles){ctx.fillStyle='#b5efff';ctx.shadowBlur=12;ctx.shadowColor='#61b8ff';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-for(const e of enemy){ctx.fillStyle=e.hit?'#fff':'#6d354f';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d8b09a';ctx.beginPath();ctx.arc(e.x,e.y-3,e.r*.55,0,Math.PI*2);ctx.fill();if(e.maxHp>40){ctx.fillStyle='#351827';ctx.fillRect(e.x-12,e.y-e.r-9,24,3);ctx.fillStyle='#e86e79';ctx.fillRect(e.x-12,e.y-e.r-9,24*(e.hp/e.maxHp),3)}}
-for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,3,3)}ctx.globalAlpha=1;
-ctx.fillStyle='#d9d4a4';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#4a4a70';ctx.beginPath();ctx.arc(player.x,player.y-8,10,Math.PI,0);ctx.fill();ctx.strokeStyle='#f2df9b';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(player.x+8,player.y+5);ctx.lineTo(player.x+24,player.y-8);ctx.stroke();ctx.restore();requestAnimationFrame(loop)}
-function loop(now){const dt=Math.min(.033,(now-last)/1000||0);last=now;update(dt);draw()}
-reset();running=false;menu.classList.remove('hidden');draw();
+function offerLevel() {
+  paused = true; choices.innerHTML = '';
+  const pool = [...upgrades].sort(() => Math.random() - .5).slice(0, 3);
+  for (const upgrade of pool) {
+    const button = document.createElement('button');
+    button.className = 'choice';
+    button.innerHTML = '<b>' + upgrade.name + '</b><span>' + upgrade.desc + '</span>';
+    button.addEventListener('click', () => {
+      upgrade.apply(player); levelUp.classList.remove('show'); paused = false; last = performance.now();
+    });
+    choices.appendChild(button);
+  }
+  levelUp.classList.add('show');
+}
+function spawnEnemy() {
+  const angle = Math.random() * Math.PI * 2;
+  const distanceFromPlayer = Math.max(W, H) * .68 + 120;
+  const hp = 28 + elapsed * .7;
+  enemies.push({ x:player.x + Math.cos(angle) * distanceFromPlayer, y:player.y + Math.sin(angle) * distanceFromPlayer, r:Math.random() < .12 ? 20 : 12, hp, maxHp:hp, speed:rand(38,63) + elapsed * .18, hit:0 });
+}
+function burst(x, y, color, count=8) {
+  for (let i=0; i<count; i++) { const angle=Math.random()*Math.PI*2, speed=rand(0,90); particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rand(.3,.7),color}); }
+}
+function endGame() {
+  running = false;
+  document.getElementById('title').textContent = 'THE HOLLOW CLAIMS YOU';
+  document.getElementById('subtitle').textContent = 'Survived ' + formatTime(elapsed) + ' · Level ' + player.level;
+  document.getElementById('start').textContent = 'TRY AGAIN';
+  menu.classList.remove('hidden');
+}
+function update(dt) {
+  if (!running || paused) return;
+  elapsed += dt;
+  let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+  let dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+  const magnitude=Math.hypot(dx,dy)||1;
+  player.x += dx/magnitude*player.speed*dt; player.y += dy/magnitude*player.speed*dt;
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) { spawnTimer=Math.max(.12,.65-elapsed*.006); spawnEnemy(); }
+  shotTimer -= dt;
+  if (shotTimer <= 0 && enemies.length) {
+    let target=null, nearest=Infinity;
+    for (const enemy of enemies) { const d=distance(player,enemy); if (d<nearest) { nearest=d; target=enemy; } }
+    if (target) { const angle=Math.atan2(target.y-player.y,target.x-player.x); projectiles.push({x:player.x,y:player.y,vx:Math.cos(angle)*player.bulletSpeed,vy:Math.sin(angle)*player.bulletSpeed,r:5,life:2}); shotTimer=player.attackRate; }
+  }
+  for (const enemy of enemies) {
+    const angle=Math.atan2(player.y-enemy.y,player.x-enemy.x);
+    enemy.x+=Math.cos(angle)*enemy.speed*dt; enemy.y+=Math.sin(angle)*enemy.speed*dt;
+    enemy.hit=Math.max(0,enemy.hit-dt);
+    if (distance(enemy,player)<enemy.r+player.r&&!enemy.hit) { player.hp-=10; enemy.hit=.7; if (player.hp<=0) { player.hp=0; endGame(); break; } }
+  }
+  for (let i=projectiles.length-1;i>=0;i--) {
+    const p=projectiles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; let remove=p.life<=0;
+    for (let j=enemies.length-1;j>=0&&!remove;j--) {
+      const enemy=enemies[j];
+      if (distance(p,enemy)<p.r+enemy.r) {
+        enemy.hp-=player.damage; burst(enemy.x,enemy.y,'#8ed8ff',4);
+        if (enemy.hp<=0) { gems.push({x:enemy.x,y:enemy.y,r:7,vx:rand(-30,30),vy:rand(-30,30)}); enemies.splice(j,1); }
+        remove=true;
+      }
+    }
+    if (remove) projectiles.splice(i,1);
+  }
+  for (let i=gems.length-1;i>=0;i--) {
+    const gem=gems[i], d=distance(gem,player);
+    if (d<player.magnet) { const angle=Math.atan2(player.y-gem.y,player.x-gem.x); gem.vx+=Math.cos(angle)*700*dt; gem.vy+=Math.sin(angle)*700*dt; }
+    gem.x+=gem.vx*dt; gem.y+=gem.vy*dt;
+    if (distance(gem,player)<player.r+gem.r) {
+      player.xp+=10; gems.splice(i,1);
+      if (player.xp>=player.nextXp) { player.xp-=player.nextXp; player.level++; player.nextXp=Math.floor(player.nextXp*1.28); offerLevel(); }
+    }
+  }
+  for (let i=particles.length-1;i>=0;i--) { const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; if(p.life<=0)particles.splice(i,1); }
+  updateUI();
+}
+function formatTime(seconds) { const min=Math.floor(seconds/60), sec=Math.floor(seconds%60); return String(min).padStart(2,'0')+':'+String(sec).padStart(2,'0'); }
+function updateUI() {
+  document.getElementById('healthFill').style.width=(player.hp/player.maxHp*100)+'%';
+  document.getElementById('xpFill').style.width=(player.xp/player.nextXp*100)+'%';
+  document.getElementById('level').textContent='LV '+player.level;
+  document.getElementById('time').textContent=formatTime(elapsed);
+}
+function draw() {
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0b0b18'; ctx.fillRect(0,0,W,H);
+  if (!player) return;
+  ctx.save(); ctx.translate(W/2-player.x,H/2-player.y);
+  ctx.strokeStyle='#17172a'; ctx.lineWidth=1; const grid=64;
+  const left=player.x-W/2, right=player.x+W/2, top=player.y-H/2, bottom=player.y+H/2;
+  for(let x=Math.floor(left/grid)*grid;x<right;x+=grid){ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,bottom);ctx.stroke();}
+  for(let y=Math.floor(top/grid)*grid;y<bottom;y+=grid){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();}
+  for(const gem of gems){ctx.fillStyle='#65d5a5';ctx.beginPath();ctx.moveTo(gem.x,gem.y-7);ctx.lineTo(gem.x+5,gem.y);ctx.lineTo(gem.x,gem.y+7);ctx.lineTo(gem.x-5,gem.y);ctx.closePath();ctx.fill();}
+  for(const p of projectiles){ctx.fillStyle='#b5efff';ctx.shadowBlur=12;ctx.shadowColor='#61b8ff';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
+  for(const enemy of enemies){ctx.fillStyle=enemy.hit?'#fff':'#6d354f';ctx.beginPath();ctx.arc(enemy.x,enemy.y,enemy.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d8b09a';ctx.beginPath();ctx.arc(enemy.x,enemy.y-3,enemy.r*.55,0,Math.PI*2);ctx.fill();if(enemy.maxHp>40){ctx.fillStyle='#351827';ctx.fillRect(enemy.x-12,enemy.y-enemy.r-9,24,3);ctx.fillStyle='#e86e79';ctx.fillRect(enemy.x-12,enemy.y-enemy.r-9,24*(enemy.hp/enemy.maxHp),3);}}
+  for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1;
+  ctx.fillStyle='#d9d4a4';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#4a4a70';ctx.beginPath();ctx.arc(player.x,player.y-8,10,Math.PI,0);ctx.fill();
+  ctx.strokeStyle='#f2df9b';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(player.x+8,player.y+5);ctx.lineTo(player.x+24,player.y-8);ctx.stroke();
+  ctx.restore();
+}
+function loop(now) { const dt=Math.min(.033,Math.max(0,(now-last)/1000)); last=now; update(dt); draw(); requestAnimationFrame(loop); }
+reset(); running=false; menu.classList.remove('hidden'); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
