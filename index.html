@@ -2,202 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090914">
   <title>Knights of the Hollow</title>
   <style>
-    :root { --gold:#f5c35b; --ink:#090914; }
-    * { box-sizing:border-box; }
-    body { margin:0; overflow:hidden; background:var(--ink); color:#fff; font-family:Georgia,serif; }
-    canvas { display:block; width:100vw; height:100vh; }
-    #ui { position:fixed; inset:0; pointer-events:none; }
-    #topbar { position:absolute; top:16px; left:50%; transform:translateX(-50%); width:min(680px,70vw); text-shadow:0 2px 3px #000; }
-    #health { height:18px; border:2px solid #20101a; background:#271923; box-shadow:0 4px 14px #0008; }
-    #healthFill { height:100%; width:100%; background:linear-gradient(90deg,#b52d45,#ef7181); transition:width .12s; }
-    #levelRow { display:flex; justify-content:space-between; margin:7px 0 3px; font-weight:bold; }
-    #xp { height:7px; background:#27233d; }
-    #xpFill { height:100%; width:0; background:linear-gradient(90deg,#55bdf4,#a9eeff); }
-    #pause { position:absolute; right:18px; top:18px; width:44px; height:44px; pointer-events:auto; border:1px solid #6d668f; border-radius:50%; background:#17172bcc; color:#fff; cursor:pointer; }
-    #menu { position:absolute; inset:0; display:grid; place-items:center; background:#080816cc; backdrop-filter:blur(5px); pointer-events:auto; }
-    #menu.hidden { display:none; }
-    .card { width:min(560px,calc(100vw - 32px)); text-align:center; background:linear-gradient(145deg,#1c1c35,#10101e); border:1px solid #57516e; border-radius:16px; padding:28px; box-shadow:0 20px 70px #000b; }
-    h1 { margin:0 0 8px; color:var(--gold); letter-spacing:3px; }
-    .subtitle { color:#aaa7bd; margin:0 0 24px; }
-    #start { border:0; border-radius:8px; padding:14px 30px; background:linear-gradient(#eec15f,#bd8732); color:#1a1020; font:700 18px Georgia; cursor:pointer; }
-    #start:hover { filter:brightness(1.12); }
-    #levelUp { position:absolute; inset:0; display:none; place-items:center; background:#080816aa; pointer-events:auto; }
-    #levelUp.show { display:grid; }
-    #choices { display:flex; gap:12px; width:min(820px,calc(100vw - 32px)); }
-    .choice { flex:1; min-width:0; border:1px solid #686083; border-radius:12px; padding:18px 12px; color:#fff; background:#1b1b31; cursor:pointer; font:16px Georgia; }
-    .choice:hover { border-color:var(--gold); transform:translateY(-3px); }
-    .choice b { display:block; color:var(--gold); margin-bottom:8px; }
-    #hint { position:absolute; bottom:18px; width:100%; text-align:center; color:#aaa7bd; font:14px Arial,sans-serif; text-shadow:0 2px 4px #000; }
-    @media(max-width:650px){ #choices{flex-direction:column}.choice{padding:10px}.card{padding:20px} #topbar{width:65vw} }
+    *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#090914;color:#fff;font-family:Georgia,serif}canvas{display:block;width:100vw;height:100vh}#ui{position:fixed;inset:0;pointer-events:none;z-index:2}#hud{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:min(680px,72vw);text-shadow:0 2px 4px #000}.bar{height:16px;background:#282033;border:1px solid #554452;border-radius:10px;overflow:hidden}.fill{height:100%;transition:width .15s}.hp{background:linear-gradient(90deg,#bd304b,#ff8190)}.xp{background:linear-gradient(90deg,#54b9ed,#b2edff)}#stats{display:flex;justify-content:space-between;margin:6px 2px;font-weight:bold}#pause{position:absolute;right:18px;top:18px;width:46px;height:46px;border:1px solid #77708e;border-radius:50%;background:#19182de8;color:white;font-size:18px;cursor:pointer;pointer-events:auto}#hint{position:absolute;bottom:18px;width:100%;text-align:center;color:#c1bdd0;font:14px Arial,sans-serif;text-shadow:0 2px 4px #000}#menu,#levelup{position:absolute;inset:0;display:grid;place-items:center;background:#080816d9;backdrop-filter:blur(5px);pointer-events:auto;z-index:5}#menu.hidden,#levelup.hidden{display:none}.card{width:min(560px,calc(100vw - 32px));padding:30px;text-align:center;background:linear-gradient(145deg,#22223b,#11111f);border:1px solid #696080;border-radius:16px;box-shadow:0 20px 70px #000b}h1{margin:0 0 8px;color:#f5c35b;letter-spacing:3px}.sub{color:#c0bbd0;margin:0 0 22px}button#start{position:relative;z-index:6;pointer-events:auto;border:0;border-radius:9px;padding:15px 32px;background:linear-gradient(#ffdc7f,#c78a35);color:#1a1020;font:bold 18px Georgia;cursor:pointer}button#start:hover{filter:brightness(1.15);transform:translateY(-1px)}#choices{display:flex;gap:12px;width:min(820px,calc(100vw - 32px))}.choice{flex:1;padding:18px 12px;border:1px solid #686083;border-radius:12px;color:white;background:#1b1b31;cursor:pointer;font:16px Georgia}.choice b{display:block;color:#f5c35b;margin-bottom:8px}@media(max-width:650px){#choices{flex-direction:column}.choice{padding:10px}.card{padding:22px}}
   </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Game arena"></canvas>
+  <canvas id="game" aria-label="Knights of the Hollow game arena"></canvas>
   <div id="ui">
-    <div id="topbar"><div id="health"><div id="healthFill"></div></div><div id="levelRow"><span id="time">00:00</span><span id="level">LV 1</span></div><div id="xp"><div id="xpFill"></div></div></div>
+    <div id="hud"><div class="bar"><div id="hp" class="fill hp" style="width:100%"></div></div><div id="stats"><span id="clock">00:00</span><span id="level">LEVEL 1</span></div><div class="bar" style="height:7px"><div id="xp" class="fill xp" style="width:0%"></div></div></div>
     <button id="pause" aria-label="Pause" title="Pause">Ⅱ</button>
     <div id="hint">Move with WASD or arrow keys · Your knight attacks automatically</div>
-    <div id="menu"><div class="card"><h1 id="title">KNIGHTS OF THE HOLLOW</h1><p class="subtitle" id="subtitle">A fantasy survival trial</p><button id="start">ENTER THE ARENA</button></div></div>
-    <div id="levelUp"><div><h2 style="text-align:center;color:var(--gold)">CHOOSE A BLESSING</h2><div id="choices"></div></div></div>
+    <section id="menu"><div class="card"><h1 id="title">KNIGHTS OF THE HOLLOW</h1><p id="subtitle" class="sub">A fantasy survival trial</p><button id="start" type="button">ENTER THE ARENA</button></div></section>
+    <section id="levelup" class="hidden"><div><h2 style="text-align:center;color:#f5c35b">CHOOSE A BLESSING</h2><div id="choices"></div></div></section>
   </div>
 <script>
 'use strict';
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-let W, H, dpr;
-function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let w=innerWidth,h=innerHeight,scale=1;
+function resize(){scale=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=w*scale;canvas.height=h*scale;ctx.setTransform(scale,0,0,scale,0,0)}
+addEventListener('resize',resize);resize();
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.startsWith('Arrow'))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let active=false,paused=false,player=null,enemies=[],gems=[],shots=[],particles=[],elapsed=0,spawnClock=0,fireClock=0,last=0;
+const rand=(a,b)=>a+Math.random()*(b-a),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function startGame(){
+  player={x:0,y:0,r:17,hp:100,maxHp:100,speed:225,damage:24,rate:.48,level:1,xp:0,next:25,magnet:115};
+  enemies=[];gems=[];shots=[];particles=[];elapsed=0;spawnClock=0;fireClock=.2;active=true;paused=false;
+  $('title').textContent='KNIGHTS OF THE HOLLOW';$('subtitle').textContent='A fantasy survival trial';$('start').textContent='ENTER THE ARENA';
+  $('menu').classList.add('hidden');$('levelup').classList.add('hidden');$('pause').textContent='Ⅱ';updateHud();
+  spawnEnemy();last=performance.now();
 }
-window.addEventListener('resize', resize); resize();
-const keys = Object.create(null);
-window.addEventListener('keydown', e => {
-  const key = e.key.toLowerCase();
-  keys[key] = true;
-  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) e.preventDefault();
-});
-window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-const menu = document.getElementById('menu');
-const levelUp = document.getElementById('levelUp');
-const choices = document.getElementById('choices');
-let running = false, paused = false, last = 0, elapsed = 0, spawnTimer = 0, shotTimer = 0;
-let player, enemies = [], gems = [], projectiles = [], particles = [];
-const rand = (min, max) => min + Math.random() * (max - min);
-const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-function reset() {
-  player = { x:0, y:0, r:16, hp:100, maxHp:100, speed:220, damage:18, attackRate:.55, bulletSpeed:430, level:1, xp:0, nextXp:25, magnet:85 };
-  enemies = []; gems = []; projectiles = []; particles = [];
-  elapsed = 0; spawnTimer = .7; shotTimer = 0; running = true; paused = false;
-  document.getElementById('pause').textContent = 'Ⅱ';
-  document.getElementById('title').textContent = 'KNIGHTS OF THE HOLLOW';
-  document.getElementById('subtitle').textContent = 'A fantasy survival trial';
-  document.getElementById('start').textContent = 'ENTER THE ARENA';
-  levelUp.classList.remove('show'); menu.classList.add('hidden');
-  updateUI(); last = performance.now();
-}
-document.getElementById('start').addEventListener('click', reset);
-document.getElementById('pause').addEventListener('click', () => {
-  if (!running) return;
-  paused = !paused;
-  document.getElementById('pause').textContent = paused ? '▶' : 'Ⅱ';
-  if (!paused) last = performance.now();
-});
-const upgrades = [
-  { name:'Honed Steel', desc:'+8 sword damage', apply:p => p.damage += 8 },
-  { name:'Fleet Footwork', desc:'+15% movement speed', apply:p => p.speed *= 1.15 },
-  { name:'Quick Draw', desc:'25% faster attacks', apply:p => p.attackRate *= .75 },
-  { name:'Silver Heart', desc:'+25 maximum health', apply:p => { p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + 25); } },
-  { name:'Lantern Charm', desc:'Larger gem magnet', apply:p => p.magnet += 55 },
-  { name:'Swift Arrows', desc:'Faster projectiles', apply:p => p.bulletSpeed += 150 }
-];
-function offerLevel() {
-  paused = true; choices.innerHTML = '';
-  const pool = [...upgrades].sort(() => Math.random() - .5).slice(0, 3);
-  for (const upgrade of pool) {
-    const button = document.createElement('button');
-    button.className = 'choice';
-    button.innerHTML = '<b>' + upgrade.name + '</b><span>' + upgrade.desc + '</span>';
-    button.addEventListener('click', () => {
-      upgrade.apply(player); levelUp.classList.remove('show'); paused = false; last = performance.now();
-    });
-    choices.appendChild(button);
-  }
-  levelUp.classList.add('show');
-}
-function spawnEnemy() {
-  const angle = Math.random() * Math.PI * 2;
-  const distanceFromPlayer = Math.max(W, H) * .68 + 120;
-  const hp = 28 + elapsed * .7;
-  enemies.push({ x:player.x + Math.cos(angle) * distanceFromPlayer, y:player.y + Math.sin(angle) * distanceFromPlayer, r:Math.random() < .12 ? 20 : 12, hp, maxHp:hp, speed:rand(38,63) + elapsed * .18, hit:0 });
-}
-function burst(x, y, color, count=8) {
-  for (let i=0; i<count; i++) { const angle=Math.random()*Math.PI*2, speed=rand(0,90); particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rand(.3,.7),color}); }
-}
-function endGame() {
-  running = false;
-  document.getElementById('title').textContent = 'THE HOLLOW CLAIMS YOU';
-  document.getElementById('subtitle').textContent = 'Survived ' + formatTime(elapsed) + ' · Level ' + player.level;
-  document.getElementById('start').textContent = 'TRY AGAIN';
-  menu.classList.remove('hidden');
-}
-function update(dt) {
-  if (!running || paused) return;
-  elapsed += dt;
-  let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
-  let dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
-  const magnitude=Math.hypot(dx,dy)||1;
-  player.x += dx/magnitude*player.speed*dt; player.y += dy/magnitude*player.speed*dt;
-  spawnTimer -= dt;
-  if (spawnTimer <= 0) { spawnTimer=Math.max(.12,.65-elapsed*.006); spawnEnemy(); }
-  shotTimer -= dt;
-  if (shotTimer <= 0 && enemies.length) {
-    let target=null, nearest=Infinity;
-    for (const enemy of enemies) { const d=distance(player,enemy); if (d<nearest) { nearest=d; target=enemy; } }
-    if (target) { const angle=Math.atan2(target.y-player.y,target.x-player.x); projectiles.push({x:player.x,y:player.y,vx:Math.cos(angle)*player.bulletSpeed,vy:Math.sin(angle)*player.bulletSpeed,r:5,life:2}); shotTimer=player.attackRate; }
-  }
-  for (const enemy of enemies) {
-    const angle=Math.atan2(player.y-enemy.y,player.x-enemy.x);
-    enemy.x+=Math.cos(angle)*enemy.speed*dt; enemy.y+=Math.sin(angle)*enemy.speed*dt;
-    enemy.hit=Math.max(0,enemy.hit-dt);
-    if (distance(enemy,player)<enemy.r+player.r&&!enemy.hit) { player.hp-=10; enemy.hit=.7; if (player.hp<=0) { player.hp=0; endGame(); break; } }
-  }
-  for (let i=projectiles.length-1;i>=0;i--) {
-    const p=projectiles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; let remove=p.life<=0;
-    for (let j=enemies.length-1;j>=0&&!remove;j--) {
-      const enemy=enemies[j];
-      if (distance(p,enemy)<p.r+enemy.r) {
-        enemy.hp-=player.damage; burst(enemy.x,enemy.y,'#8ed8ff',4);
-        if (enemy.hp<=0) { gems.push({x:enemy.x,y:enemy.y,r:7,vx:rand(-30,30),vy:rand(-30,30)}); enemies.splice(j,1); }
-        remove=true;
-      }
-    }
-    if (remove) projectiles.splice(i,1);
-  }
-  for (let i=gems.length-1;i>=0;i--) {
-    const gem=gems[i], d=distance(gem,player);
-    if (d<player.magnet) { const angle=Math.atan2(player.y-gem.y,player.x-gem.x); gem.vx+=Math.cos(angle)*700*dt; gem.vy+=Math.sin(angle)*700*dt; }
-    gem.x+=gem.vx*dt; gem.y+=gem.vy*dt;
-    if (distance(gem,player)<player.r+gem.r) {
-      player.xp+=10; gems.splice(i,1);
-      if (player.xp>=player.nextXp) { player.xp-=player.nextXp; player.level++; player.nextXp=Math.floor(player.nextXp*1.28); offerLevel(); }
-    }
-  }
-  for (let i=particles.length-1;i>=0;i--) { const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; if(p.life<=0)particles.splice(i,1); }
-  updateUI();
-}
-function formatTime(seconds) { const min=Math.floor(seconds/60), sec=Math.floor(seconds%60); return String(min).padStart(2,'0')+':'+String(sec).padStart(2,'0'); }
-function updateUI() {
-  document.getElementById('healthFill').style.width=(player.hp/player.maxHp*100)+'%';
-  document.getElementById('xpFill').style.width=(player.xp/player.nextXp*100)+'%';
-  document.getElementById('level').textContent='LV '+player.level;
-  document.getElementById('time').textContent=formatTime(elapsed);
-}
-function draw() {
-  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0b0b18'; ctx.fillRect(0,0,W,H);
-  if (!player) return;
-  ctx.save(); ctx.translate(W/2-player.x,H/2-player.y);
-  ctx.strokeStyle='#17172a'; ctx.lineWidth=1; const grid=64;
-  const left=player.x-W/2, right=player.x+W/2, top=player.y-H/2, bottom=player.y+H/2;
-  for(let x=Math.floor(left/grid)*grid;x<right;x+=grid){ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,bottom);ctx.stroke();}
-  for(let y=Math.floor(top/grid)*grid;y<bottom;y+=grid){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();}
-  for(const gem of gems){ctx.fillStyle='#65d5a5';ctx.beginPath();ctx.moveTo(gem.x,gem.y-7);ctx.lineTo(gem.x+5,gem.y);ctx.lineTo(gem.x,gem.y+7);ctx.lineTo(gem.x-5,gem.y);ctx.closePath();ctx.fill();}
-  for(const p of projectiles){ctx.fillStyle='#b5efff';ctx.shadowBlur=12;ctx.shadowColor='#61b8ff';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
-  for(const enemy of enemies){ctx.fillStyle=enemy.hit?'#fff':'#6d354f';ctx.beginPath();ctx.arc(enemy.x,enemy.y,enemy.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d8b09a';ctx.beginPath();ctx.arc(enemy.x,enemy.y-3,enemy.r*.55,0,Math.PI*2);ctx.fill();if(enemy.maxHp>40){ctx.fillStyle='#351827';ctx.fillRect(enemy.x-12,enemy.y-enemy.r-9,24,3);ctx.fillStyle='#e86e79';ctx.fillRect(enemy.x-12,enemy.y-enemy.r-9,24*(enemy.hp/enemy.maxHp),3);}}
-  for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1;
-  ctx.fillStyle='#d9d4a4';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#4a4a70';ctx.beginPath();ctx.arc(player.x,player.y-8,10,Math.PI,0);ctx.fill();
-  ctx.strokeStyle='#f2df9b';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(player.x+8,player.y+5);ctx.lineTo(player.x+24,player.y-8);ctx.stroke();
-  ctx.restore();
-}
-function loop(now) { const dt=Math.min(.033,Math.max(0,(now-last)/1000)); last=now; update(dt); draw(); requestAnimationFrame(loop); }
-reset(); running=false; menu.classList.remove('hidden'); requestAnimationFrame(loop);
+$('start').addEventListener('click',e=>{e.preventDefault();startGame()});
+$('pause').addEventListener('click',()=>{if(!active)return;paused=!paused;$('pause').textContent=paused?'▶':'Ⅱ';last=performance.now()});
+function spawnEnemy(){const a=Math.random()*Math.PI*2,r=Math.max(w,h)*.62+50,hp=34+elapsed*.8;enemies.push({x:player.x+Math.cos(a)*r,y:player.y+Math.sin(a)*r,r:Math.random()<.14?19:13,hp,max:hp,speed:rand(42,65)+elapsed*.15,flash:0})}
+function burst(x,y,color,n=7){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=rand(20,130);particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.2,.65),color})}}
+function finish(){active=false;$('title').textContent='THE HOLLOW CLAIMS YOU';$('subtitle').textContent='Survived '+formatTime(elapsed)+' · Level '+player.level;$('start').textContent='TRY AGAIN';$('menu').classList.remove('hidden')}
+const blessings=[['Honed Steel','Deal more damage',p=>p.damage+=9],['Fleet Footwork','Move faster',p=>p.speed*=1.16],['Quick Draw','Attack faster',p=>p.rate*=.78],['Silver Heart','Restore 25 health',p=>{p.maxHp+=25;p.hp=Math.min(p.maxHp,p.hp+35)}],['Lantern Charm','Collect gems from farther away',p=>p.magnet+=70],['Swift Arrows','Projectiles fly faster',p=>p.shotSpeed+=130]];
+function chooseBlessing(){paused=true;const box=$('choices');box.replaceChildren();[...blessings].sort(()=>Math.random()-.5).slice(0,3).forEach(item=>{const b=document.createElement('button');b.className='choice';b.innerHTML='<b>'+item[0]+'</b>'+item[1];b.onclick=()=>{item[2](player);$('levelup').classList.add('hidden');paused=false;last=performance.now()};box.appendChild(b)});$('levelup').classList.remove('hidden')}
+function updateHud(){$('hp').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xp').style.width=player.xp/player.next*100+'%';$('level').textContent='LEVEL '+player.level;$('clock').textContent=formatTime(elapsed)}
+function formatTime(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0')}
+function update(dt){if(!active||paused)return;elapsed+=dt;
+  const dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),mag=Math.hypot(dx,dy)||1;
+  player.x+=dx/mag*player.speed*dt;player.y+=dy/mag*player.speed*dt;
+  spawnClock-=dt;if(spawnClock<=0){spawnEnemy();spawnClock=Math.max(.16,.72-elapsed*.005)}
+  fireClock-=dt;if(fireClock<=0&&enemies.length){let target=enemies[0],best=Infinity;for(const e of enemies){const d=dist(player,e);if(d<best){best=d;target=e}}const a=Math.atan2(target.y-player.y,target.x-player.x);shots.push({x:player.x,y:player.y,vx:Math.cos(a)*(player.shotSpeed||460),vy:Math.sin(a)*(player.shotSpeed||460),life:2});fireClock=player.rate}
+  for(const e of enemies){const a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;e.flash=Math.max(0,e.flash-dt);if(dist(e,player)<e.r+player.r&&!e.flash){player.hp-=12;e.flash=.65;if(player.hp<=0){player.hp=0;finish();break}}}
+  for(let i=shots.length-1;i>=0;i--){const s=shots[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;let hit=s.life<=0;for(let j=enemies.length-1;j>=0&&!hit;j--){const e=enemies[j];if(dist(s,e)<e.r+6){e.hp-=player.damage;e.flash=.08;burst(e.x,e.y,'#b8eaff',4);hit=true;if(e.hp<=0){gems.push({x:e.x,y:e.y,vx:rand(-20,20),vy:rand(-20,20)});enemies.splice(j,1)}}}if(hit)shots.splice(i,1)}
+  for(let i=gems.length-1;i>=0;i--){const g=gems[i],d=dist(g,player);if(d<player.magnet){const a=Math.atan2(player.y-g.y,player.x-g.x);g.vx+=Math.cos(a)*850*dt;g.vy+=Math.sin(a)*850*dt}g.x+=g.vx*dt;g.y+=g.vy*dt;if(dist(g,player)<player.r+9){gems.splice(i,1);player.xp+=10;if(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.3);chooseBlessing()}}}
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}updateHud()}
+function draw(){ctx.clearRect(0,0,w,h);ctx.fillStyle='#10101d';ctx.fillRect(0,0,w,h);if(!player)return;
+  const ox=w/2-player.x,oy=h/2-player.y,grid=64;ctx.strokeStyle='#202035';ctx.lineWidth=1;for(let x=((ox%grid)+grid)%grid;x<w;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=((oy%grid)+grid)%grid;y<h;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  ctx.save();ctx.translate(ox,oy);
+  for(const g of gems){ctx.fillStyle='#76f0b2';ctx.shadowColor='#36e89a';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(g.x,g.y-8);ctx.lineTo(g.x+6,g.y);ctx.lineTo(g.x,g.y+8);ctx.lineTo(g.x-6,g.y);ctx.closePath();ctx.fill();ctx.shadowBlur=0}
+  for(const s of shots){ctx.fillStyle='#c8f2ff';ctx.shadowColor='#67bfff';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(s.x,s.y,6,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
+  for(const e of enemies){ctx.fillStyle=e.flash?'#fff':'#71384f';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e7b9a2';ctx.beginPath();ctx.arc(e.x,e.y-3,e.r*.52,0,Math.PI*2);ctx.fill();if(e.max>40){ctx.fillStyle='#351827';ctx.fillRect(e.x-14,e.y-e.r-10,28,4);ctx.fillStyle='#ec7486';ctx.fillRect(e.x-14,e.y-e.r-10,28*Math.max(0,e.hp/e.max),4)}}
+  for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4)}ctx.globalAlpha=1;
+  // Knight: cloak, helmet, bright sword and glow make the player easy to spot.
+  ctx.shadowColor='#f5c35b';ctx.shadowBlur=18;ctx.fillStyle='#f0c45e';ctx.beginPath();ctx.arc(player.x,player.y,player.r+4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#d9d4c3';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#55577e';ctx.beginPath();ctx.arc(player.x,player.y-6,11,Math.PI,0);ctx.fill();ctx.strokeStyle='#fff0ad';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(player.x+9,player.y+5);ctx.lineTo(player.x+27,player.y-13);ctx.stroke();
+  ctx.restore()}
+function loop(now){const dt=Math.min(.04,Math.max(0,(now-last)/1000));last=now;update(dt);draw();requestAnimationFrame(loop)}
+// Keep the menu visible until the player's click starts a fresh run.
+player={x:0,y:0,r:17};draw();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
