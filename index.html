@@ -28,55 +28,60 @@ addEventListener('resize',resize);resize();
 const keys={};
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.startsWith('Arrow'))e.preventDefault()});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-let active=false,paused=false,player=null,enemies=[],gems=[],shots=[],particles=[],elapsed=0,spawnClock=0,fireClock=0,last=0;
+let active=false,paused=false,player=null,enemies=[],gems=[],particles=[],elapsed=0,spawnClock=0,slashClock=0,slashVisual=0,laserClock=0,laserBeam=null,last=0;
 const rand=(a,b)=>a+Math.random()*(b-a),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function startGame(){
-  player={x:0,y:0,r:17,hp:100,maxHp:100,speed:225,damage:24,rate:.48,level:1,xp:0,next:25,magnet:115,aimAngle:0};
-  enemies=[];gems=[];shots=[];particles=[];elapsed=0;spawnClock=0;fireClock=.2;active=true;paused=false;
+  player={x:0,y:0,r:17,hp:100,maxHp:100,speed:225,damage:24,slashRate:.62,slashRange:92,level:1,xp:0,next:25,magnet:115,aimAngle:0,laserLevel:0,laserDamage:28,laserRate:1.15};
+  enemies=[];gems=[];particles=[];elapsed=0;spawnClock=0;slashClock=.2;slashVisual=0;laserClock=.4;laserBeam=null;active=true;paused=false;
   $('title').textContent='KNIGHTS OF THE HOLLOW';$('subtitle').textContent='A fantasy survival trial';$('start').textContent='ENTER THE ARENA';
-  $('menu').classList.add('hidden');$('levelup').classList.add('hidden');$('pause').textContent='Ⅱ';updateHud();
-  spawnEnemy();last=performance.now();
+  $('menu').classList.add('hidden');$('levelup').classList.add('hidden');$('pause').textContent='Ⅱ';updateHud();spawnEnemy();last=performance.now();
 }
 $('start').addEventListener('click',e=>{e.preventDefault();startGame()});
 $('pause').addEventListener('click',()=>{if(!active)return;paused=!paused;$('pause').textContent=paused?'▶':'Ⅱ';last=performance.now()});
 function spawnEnemy(){const a=Math.random()*Math.PI*2,r=Math.max(w,h)*.62+50,hp=34+elapsed*.8;enemies.push({x:player.x+Math.cos(a)*r,y:player.y+Math.sin(a)*r,r:Math.random()<.14?19:13,hp,max:hp,speed:rand(42,65)+elapsed*.15,flash:0})}
 function burst(x,y,color,n=7){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=rand(20,130);particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.2,.65),color})}}
 function finish(){active=false;$('title').textContent='THE HOLLOW CLAIMS YOU';$('subtitle').textContent='Survived '+formatTime(elapsed)+' · Level '+player.level;$('start').textContent='TRY AGAIN';$('menu').classList.remove('hidden')}
-const blessings=[['Honed Steel','Deal more damage',p=>p.damage+=9],['Fleet Footwork','Move faster',p=>p.speed*=1.16],['Quick Draw','Attack faster',p=>p.rate*=.78],['Silver Heart','Restore 25 health',p=>{p.maxHp+=25;p.hp=Math.min(p.maxHp,p.hp+35)}],['Lantern Charm','Collect gems from farther away',p=>p.magnet+=70],['Swift Arrows','Projectiles fly faster',p=>p.shotSpeed+=130]];
-function chooseBlessing(){paused=true;const box=$('choices');box.replaceChildren();[...blessings].sort(()=>Math.random()-.5).slice(0,3).forEach(item=>{const b=document.createElement('button');b.className='choice';b.innerHTML='<b>'+item[0]+'</b>'+item[1];b.onclick=()=>{item[2](player);$('levelup').classList.add('hidden');paused=false;last=performance.now()};box.appendChild(b)});$('levelup').classList.remove('hidden')}
+const blessings=[
+  {name:'Honed Steel',desc:'Deal more damage with your sword',apply:p=>p.damage+=9},
+  {name:'Fleet Footwork',desc:'Move faster',apply:p=>p.speed*=1.16},
+  {name:'Swift Slash',desc:'Slash more often and farther',apply:p=>{p.slashRate*=.84;p.slashRange+=12}},
+  {name:'Silver Heart',desc:'Restore health and raise max health',apply:p=>{p.maxHp+=25;p.hp=Math.min(p.maxHp,p.hp+35)}},
+  {name:'Lantern Charm',desc:'Collect gems from farther away',apply:p=>p.magnet+=70},
+  {name:'Laser Rune',desc:'Unlock a piercing laser beam',available:p=>p.laserLevel===0,apply:p=>{p.laserLevel=1}},
+  {name:'Focused Laser',desc:'Increase laser damage and fire rate',available:p=>p.laserLevel>0,apply:p=>{p.laserLevel++;p.laserDamage+=18;p.laserRate*=.82}}
+];
+function chooseBlessing(){paused=true;const box=$('choices');box.replaceChildren();const available=blessings.filter(b=>!b.available||b.available(player));[...available].sort(()=>Math.random()-.5).slice(0,3).forEach(item=>{const b=document.createElement('button');b.className='choice';b.innerHTML='<b>'+item.name+'</b>'+item.desc;b.onclick=()=>{item.apply(player);$('levelup').classList.add('hidden');paused=false;last=performance.now()};box.appendChild(b)});$('levelup').classList.remove('hidden')}
 function updateHud(){$('hp').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xp').style.width=player.xp/player.next*100+'%';$('level').textContent='LEVEL '+player.level;$('clock').textContent=formatTime(elapsed)}
 function formatTime(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0')}
+function nearestEnemy(){let target=null,best=Infinity;for(const e of enemies){const d=dist(player,e);if(d<best){best=d;target=e}}return target}
+function slashAttack(target){const a=Math.atan2(target.y-player.y,target.x-player.x);player.aimAngle=a;slashVisual=.24;const halfArc=.9;for(const e of enemies){const d=dist(player,e);if(d>player.slashRange+e.r)continue;const angle=Math.atan2(e.y-player.y,e.x-player.x);let diff=Math.atan2(Math.sin(angle-a),Math.cos(angle-a));if(Math.abs(diff)<=halfArc){e.hp-=player.damage;e.flash=.12;burst(e.x,e.y,'#ffe49a',3)}}}
+function fireLaser(target){const a=Math.atan2(target.y-player.y,target.x-player.x);player.aimAngle=a;laserBeam={x1:player.x,y1:player.y,x2:target.x,y2:target.y,life:.2};target.hp-=player.laserDamage;target.flash=.12;burst(target.x,target.y,'#a9efff',5)}
 function update(dt){if(!active||paused)return;elapsed+=dt;
   const dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),mag=Math.hypot(dx,dy)||1;
   player.x+=dx/mag*player.speed*dt;player.y+=dy/mag*player.speed*dt;
   spawnClock-=dt;if(spawnClock<=0){spawnEnemy();spawnClock=Math.max(.16,.72-elapsed*.005)}
-  fireClock-=dt;if(fireClock<=0&&enemies.length){let target=enemies[0],best=Infinity;for(const e of enemies){const d=dist(player,e);if(d<best){best=d;target=e}}const a=Math.atan2(target.y-player.y,target.x-player.x);player.aimAngle=a;shots.push({x:player.x,y:player.y,vx:Math.cos(a)*(player.shotSpeed||460),vy:Math.sin(a)*(player.shotSpeed||460),life:2});fireClock=player.rate}
+  slashClock-=dt;slashVisual=Math.max(0,slashVisual-dt);laserClock-=dt;if(laserBeam){laserBeam.life-=dt;if(laserBeam.life<=0)laserBeam=null}
+  const target=nearestEnemy();if(target){if(slashClock<=0){slashAttack(target);slashClock=player.slashRate}if(player.laserLevel>0&&laserClock<=0){fireLaser(target);laserClock=player.laserRate}}
   for(const e of enemies){const a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;e.flash=Math.max(0,e.flash-dt);if(dist(e,player)<e.r+player.r&&!e.flash){player.hp-=12;e.flash=.65;if(player.hp<=0){player.hp=0;finish();break}}}
-  for(let i=shots.length-1;i>=0;i--){const s=shots[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;let hit=s.life<=0;for(let j=enemies.length-1;j>=0&&!hit;j--){const e=enemies[j];if(dist(s,e)<e.r+6){e.hp-=player.damage;e.flash=.08;burst(e.x,e.y,'#b8eaff',4);hit=true;if(e.hp<=0){gems.push({x:e.x,y:e.y,vx:rand(-20,20),vy:rand(-20,20)});enemies.splice(j,1)}}}if(hit)shots.splice(i,1)}
+  for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.hp<=0){gems.push({x:e.x,y:e.y,vx:rand(-20,20),vy:rand(-20,20)});enemies.splice(i,1)}}
   for(let i=gems.length-1;i>=0;i--){const g=gems[i],d=dist(g,player);if(d<player.magnet){const a=Math.atan2(player.y-g.y,player.x-g.x);g.vx+=Math.cos(a)*850*dt;g.vy+=Math.sin(a)*850*dt}g.x+=g.vx*dt;g.y+=g.vy*dt;if(dist(g,player)<player.r+9){gems.splice(i,1);player.xp+=10;if(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.3);chooseBlessing()}}}
   for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}updateHud()}
 function draw(){ctx.clearRect(0,0,w,h);ctx.fillStyle='#10101d';ctx.fillRect(0,0,w,h);if(!player)return;
   const ox=w/2-player.x,oy=h/2-player.y,grid=64;ctx.strokeStyle='#202035';ctx.lineWidth=1;for(let x=((ox%grid)+grid)%grid;x<w;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=((oy%grid)+grid)%grid;y<h;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
   ctx.save();ctx.translate(ox,oy);
   for(const g of gems){ctx.fillStyle='#76f0b2';ctx.shadowColor='#36e89a';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(g.x,g.y-8);ctx.lineTo(g.x+6,g.y);ctx.lineTo(g.x,g.y+8);ctx.lineTo(g.x-6,g.y);ctx.closePath();ctx.fill();ctx.shadowBlur=0}
-  for(const s of shots){ctx.fillStyle='#c8f2ff';ctx.shadowColor='#67bfff';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(s.x,s.y,6,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
   for(const e of enemies){ctx.fillStyle=e.flash?'#fff':'#71384f';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e7b9a2';ctx.beginPath();ctx.arc(e.x,e.y-3,e.r*.52,0,Math.PI*2);ctx.fill();if(e.max>40){ctx.fillStyle='#351827';ctx.fillRect(e.x-14,e.y-e.r-10,28,4);ctx.fillStyle='#ec7486';ctx.fillRect(e.x-14,e.y-e.r-10,28*Math.max(0,e.hp/e.max),4)}}
   for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4)}ctx.globalAlpha=1;
+  if(laserBeam){ctx.globalAlpha=Math.min(1,laserBeam.life*7);ctx.strokeStyle='#c9f8ff';ctx.lineWidth=11;ctx.shadowColor='#46cfff';ctx.shadowBlur=24;ctx.beginPath();ctx.moveTo(laserBeam.x1,laserBeam.y1);ctx.lineTo(laserBeam.x2,laserBeam.y2);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(laserBeam.x1,laserBeam.y1);ctx.lineTo(laserBeam.x2,laserBeam.y2);ctx.stroke();ctx.globalAlpha=1}
+  if(slashVisual>0){ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.aimAngle);ctx.globalAlpha=Math.min(1,slashVisual*5);ctx.fillStyle='#ffe99a';ctx.shadowColor='#ffd45b';ctx.shadowBlur=22;ctx.beginPath();ctx.moveTo(12,-10);ctx.arc(0,0,player.slashRange,-.9,.9);ctx.closePath();ctx.fill();ctx.globalAlpha=1;ctx.shadowBlur=0;ctx.restore()}
   // Knight body and helmet.
-  ctx.shadowColor='#f5c35b';ctx.shadowBlur=18;ctx.fillStyle='#f0c45e';ctx.beginPath();ctx.arc(player.x,player.y,player.r+4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
-  ctx.fillStyle='#d9d4c3';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();
-  // Rotate the sword so its point follows the direction of the auto-aimed shot.
-  ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.aimAngle);
-  ctx.strokeStyle='#4a4a70';ctx.lineWidth=7;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(7,6);ctx.lineTo(17,0);ctx.stroke();
-  ctx.strokeStyle='#f4d774';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(13,2);ctx.lineTo(30,-3);ctx.stroke();
-  ctx.fillStyle='#fff4c2';ctx.beginPath();ctx.moveTo(30,-3);ctx.lineTo(23,-7);ctx.lineTo(25,0);ctx.closePath();ctx.fill();
-  ctx.restore();
-  // Helmet visor also faces the target.
-  ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.aimAngle);ctx.fillStyle='#55577e';ctx.beginPath();ctx.arc(0,-5,11,Math.PI,0);ctx.fill();ctx.fillStyle='#a9eaff';ctx.fillRect(5,-5,7,3);ctx.restore();
-  ctx.restore()}
+  ctx.shadowColor='#f5c35b';ctx.shadowBlur=18;ctx.fillStyle='#f0c45e';ctx.beginPath();ctx.arc(player.x,player.y,player.r+4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#d9d4c3';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();
+  // Sword follows the auto-aimed slash/laser direction.
+  ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.aimAngle);const swing=slashVisual>0?Math.sin((slashVisual/.24)*Math.PI)*.65:0;ctx.rotate(swing);ctx.strokeStyle='#4a4a70';ctx.lineWidth=7;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(7,6);ctx.lineTo(17,0);ctx.stroke();ctx.strokeStyle='#f4d774';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(13,2);ctx.lineTo(30,-3);ctx.stroke();ctx.fillStyle='#fff4c2';ctx.beginPath();ctx.moveTo(30,-3);ctx.lineTo(23,-7);ctx.lineTo(25,0);ctx.closePath();ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.aimAngle);ctx.fillStyle='#55577e';ctx.beginPath();ctx.arc(0,-5,11,Math.PI,0);ctx.fill();ctx.fillStyle='#a9eaff';ctx.fillRect(5,-5,7,3);ctx.restore();ctx.restore()}
 function loop(now){const dt=Math.min(.04,Math.max(0,(now-last)/1000));last=now;update(dt);draw();requestAnimationFrame(loop)}
 // Keep the menu visible until the player's click starts a fresh run.
-player={x:0,y:0,r:17,aimAngle:0};draw();requestAnimationFrame(loop);
+player={x:0,y:0,r:17,aimAngle:0,slashRange:92};draw();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
